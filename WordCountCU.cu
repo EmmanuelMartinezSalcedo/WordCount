@@ -1,21 +1,17 @@
 #include <cuda_runtime.h>
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
-#include <thrust/sort.h>
-#include <thrust/reduce.h>
-#include <thrust/execution_policy.h>
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
+#include <chrono>
 
 using namespace std;
 
-const size_t CHUNK_SIZE = 1024 * 1024 * 64; // 64MB chunks
+const size_t CHUNK_SIZE = 1024 * 1024 * 16; // 16MB chunks
 const int MAX_WORD_LENGTH = 50;
-const int NUM_STREAMS = 4;
+const int NUM_STREAMS = 48;
 
 __device__ bool d_isspace(char c) {
   return c == ' ' || c == '\n' || c == '\r' || c == '\t';
@@ -103,6 +99,8 @@ __global__ void processWordsKernel(char *chunk, size_t chunkSize, char *words, i
 }
 
 int main() {
+  auto start_time = chrono::high_resolution_clock::now();
+
   cudaStream_t streams[NUM_STREAMS];
   for (int i = 0; i < NUM_STREAMS; i++) {
     cudaStreamCreate(&streams[i]);
@@ -131,7 +129,11 @@ int main() {
   unordered_map<string, int> wordFrequency;
   int currentStream = 0;
 
+  float process_time = 0;
+
   for (size_t offset = 0; offset < fileSize; offset += CHUNK_SIZE) {
+    auto chunk_start = chrono::high_resolution_clock::now();
+
     size_t currentChunkSize = min(CHUNK_SIZE, fileSize - offset);
 
     file.read(h_chunk, currentChunkSize);
@@ -166,6 +168,9 @@ int main() {
 
     currentStream = (currentStream + 1) % NUM_STREAMS;
 
+    auto chunk_end = chrono::high_resolution_clock::now();
+    process_time += chrono::duration<float>(chunk_end - chunk_start).count();
+
     float progress = (float)offset / fileSize * 100;
     cout << "\rProgress: " << progress << "%" << flush;
   }
@@ -178,6 +183,13 @@ int main() {
   sort(wordList.begin(), wordList.end(), [](const auto &a, const auto &b) {
     return a.second > b.second;
   });
+
+  auto end_time = chrono::high_resolution_clock::now();
+  float total_time = chrono::duration<float>(end_time - start_time).count();
+
+  cout << "\n\nPerformance Statistics:\n";
+  cout << "----------------------\n";
+  cout << "Total time: " << total_time << " seconds\n";
 
   cout << "\n\nWord frequencies:\n";
   cout << "Word\t\tCount\n";
@@ -198,3 +210,7 @@ int main() {
 
   return 0;
 }
+
+// Compile: "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+//          nvcc -O3 -arch=sm_89 -std=c++17 WordCountCU.cu -o WordCountCU.exe
+// Run:     WordCountCU.exe

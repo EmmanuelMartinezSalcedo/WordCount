@@ -10,7 +10,7 @@
 using namespace std;
 namespace fs = std::filesystem;
 
-const long long FILE_SIZE = 20LL * 1024 * 1024 * 1024; // 20GB
+const long long GB = 1024LL * 1024 * 1024; // 1 GB
 const int CHUNK_SIZE = 1024 * 1024;
 const int DEFAULT_VOCAB_SIZE = 1000;
 
@@ -75,10 +75,18 @@ vector<string> load_dictionary(int vocab_size) {
 
 int main(int argc, char* argv[]) {
   int vocab_size = DEFAULT_VOCAB_SIZE;
+  long long file_size = 20LL * GB;
   if (argc > 1) {
     vocab_size = atoi(argv[1]) * 5;
     if (vocab_size <= 0) {
       cerr << "Error: Vocabulary size must be positive\n";
+      return 1;
+    }
+  }
+  if (argc > 2) {
+    file_size = atoll(argv[2]) * GB;
+    if (file_size <= 0) {
+      cerr << "Error: File size must be positive\n";
       return 1;
     }
   }
@@ -124,16 +132,16 @@ int main(int argc, char* argv[]) {
   int lastPercentage = -1;
   const int barWidth = 50;
 
-  while (written < FILE_SIZE) {
+  while (written < file_size) {
     for (int i = 0; i < 500; ++i) {
       chunk += dictionary[word_dist(gen)] + " ";
     }
     file << chunk;
     written += chunk.size();
 
-    int currentPercentage = (written * 100) / FILE_SIZE;
+    int currentPercentage = (written * 100) / file_size;
     if (currentPercentage != lastPercentage) {
-      float progress = (float)written / FILE_SIZE;
+      float progress = (float)written / file_size;
       int pos = barWidth * progress;
       cout << "\r[";
       for (int i = 0; i < barWidth; ++i) {
@@ -154,3 +162,6 @@ int main(int argc, char* argv[]) {
   cout << "To check a part of the file (Powershell)\n";
   return 0;
 }
+
+//Compile: cl /std:c++17 FileGenerator.cpp
+//Run:     FileGenerator.exe 5 20

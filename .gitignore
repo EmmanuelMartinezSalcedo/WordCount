@@ -1,1 +1,8 @@
-large_text.exe
+large_text.txt
+.vscode/
+FileGenerator.exe
+FileGenerator.obj
+WordCountCU.exe
+WordCountCU.exp
+WordCountCU.lib
+stats.csv
